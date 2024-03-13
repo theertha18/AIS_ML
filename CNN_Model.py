@@ -7,6 +7,10 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import Conv1D, Dropout, MaxPooling1D, Flatten, Dense
 from sklearn.metrics import classification_report
 
+def read_and_prepare_data(dataset_path):
+    dataframe = pd.read_csv(dataset_path)
+    df = dataframe.iloc[:, 16:]
+    return df
 def apply_window(signal, window_type='hann'):
     # Ensure the window type is a valid string or tuple as required by get_window
     if not isinstance(window_type, (str, tuple)):
@@ -14,12 +18,6 @@ def apply_window(signal, window_type='hann'):
     # Generate the window using scipy's get_window function
     window = get_window(window_type, len(signal))
     return signal * window
-
-def read_and_prepare_data(dataset_path):
-    dataframe = pd.read_csv(dataset_path)
-    df = dataframe.iloc[:, 16:]
-    return df
-
 def reduce_noise_and_label(df, dt):
     distances = np.zeros((len(df.index),), dtype=float)
     peaks_list = np.zeros((len(df.index),), dtype=int)
