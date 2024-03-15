@@ -4,22 +4,56 @@ from scipy.signal import hilbert, get_window, find_peaks
 import time, pickle
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score, recall_score, confusion_matrix, classification_report
+from sklearn.metrics import f1_score, classification_report
 
 def read_and_prepare_data(dataset_path):
-    dataframe = pd.read_csv(dataset_path)
+    """
+        Reads a dataset from a CSV file and selects a specific portion of its columns.
+
+        Parameters:
+        - dataset_path: str, the file path to the CSV dataset.
+
+        Returns:
+        - DataFrame containing the selected columns of the original dataset.
+        """
+    # Load the dataset with no header, as we're assuming it doesn't have one
+    dataframe = pd.read_csv(dataset_path, header=None)
+    # Select columns starting from the 17th (index 16) onwards, assuming these contain the relevant data
     df = dataframe.iloc[:, 16:]
     return df
 
 def apply_window(signal, window_type='hann'):
-    # Ensure the window type is a valid string or tuple as required by get_window
+    """
+    Applies a windowing function to a signal to reduce spectral leakage.
+
+    Parameters:
+    - signal: ndarray, the original signal to be windowed.
+    - window_type: str or tuple, specifying the type of window to apply.
+
+    Returns:
+    - The windowed signal as an array.
+    """
+    # Validate window type input
     if not isinstance(window_type, (str, tuple)):
         raise ValueError("Window type must be a string or a tuple")
-    # Generate the window using scipy's get_window function
+    # Generate the window based on the specified type and signal length
     window = get_window(window_type, len(signal))
+    # Apply the window to the signal by element-wise multiplication
     return signal * window
 
 def reduce_noise_and_label(df, dt):
+    """
+       Applies signal processing techniques to reduce noise, detect peaks, and calculate distances from a DataFrame of signals.
+
+       Parameters:
+       - df: DataFrame, containing signals in its rows.
+       - dt: float, the time interval between signal samples.
+
+       Returns:
+       - peaks_list: ndarray, the positions of the highest peak in each signal.
+       - distances: ndarray, the calculated distance for each signal based on the peak position.
+       - filtered_signals: ndarray, the signals after noise reduction and filtering.
+    """
     distances = np.zeros((len(df.index),), dtype=float)
     peaks_list = np.zeros((len(df.index),), dtype=int)
     filtered_signals = np.zeros(df.shape)  # Initialize array to store filtered signals
@@ -27,27 +61,26 @@ def reduce_noise_and_label(df, dt):
     for i in range(len(df.index)):
         f = df.iloc[i, :]
 
-        # Apply window function to the signal
+        # Apply window function to the signal to reduce edge effects
         windowed_signal = apply_window(f)
 
+        # Fourier Transform for frequency analysis
         n = len(windowed_signal)
-        time = np.arange(n) * dt  # Time array
         fhat = np.fft.fft(windowed_signal, n)
         PSD = fhat * np.conj(fhat) / n
-        freq = (1 / (dt * n)) * np.arange(n)
-        L = np.arange(1, n // 2, dtype='int')
 
         indices = PSD > 1.5  # Thresholding the Power Spectral Density
-        PSDclean = PSD * indices
         fhat = indices * fhat
-        ffilt = np.fft.ifft(fhat)
+        ffilt = np.fft.ifft(fhat) # Inverse FFT for filtered signal
 
-        filtered_signals[i, :] = ffilt.real  # Store the real part of the filtered signal
+        filtered_signals[i, :] = ffilt.real  # Store the filtered signal
 
+        # Analyze the signal envelope to find peaks
         analytical_signal = hilbert(ffilt.real)
         env = np.abs(analytical_signal)
         peaks, _ = find_peaks(env, distance=n)
 
+        # Calculate distance based on peak position
         if len(peaks) > 0:
             pos_highest_peak = peaks[0]  # Position of the highest peak, assuming it's the first one
             distance = 0.5 * pos_highest_peak * dt * 2 * 343  # Calculate distance
@@ -92,6 +125,19 @@ def group_labeled_data(peaks_list, signal_length, window_width):
 
 # Train Random Forest model
 def train_model(xtrain, xtest, ytrain, ytest):
+    """
+       Trains a RandomForest model using Randomized Search CV for hyperparameter tuning,
+       evaluates its performance using F1 scores on both training and test data, and saves the best model.
+
+       Parameters:
+       - xtrain: ndarray, training data features.
+       - xtest: ndarray, test data features.
+       - ytrain: ndarray, training data labels.
+       - ytest: ndarray, test data labels.
+
+       Returns:
+       - The trained RandomForest model with the best found parameters.
+    """
     rf = RandomForestClassifier()
     param_grid = {
         'n_estimators': [50, 100, 150],
