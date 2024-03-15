@@ -8,17 +8,53 @@ from tensorflow.keras.layers import Conv1D, Dropout, MaxPooling1D, Flatten, Dens
 from sklearn.metrics import classification_report
 
 def read_and_prepare_data(dataset_path):
+    """
+        Reads a dataset from a CSV file and selects a specific portion of its columns.
+
+        Parameters:
+        - dataset_path: str, the file path to the CSV dataset.
+
+        Returns:
+        - DataFrame containing the selected columns of the original dataset.
+        """
+    # Load the dataset with no header, as we're assuming it doesn't have one
     dataframe = pd.read_csv(dataset_path, header=None)
+    # Select columns starting from the 17th (index 16) onwards, assuming these contain the relevant data
     df = dataframe.iloc[:, 16:]
     return df
+
 def apply_window(signal, window_type='hann'):
-    # Ensure the window type is a valid string or tuple as required by get_window
+    """
+    Applies a windowing function to a signal to reduce spectral leakage.
+
+    Parameters:
+    - signal: ndarray, the original signal to be windowed.
+    - window_type: str or tuple, specifying the type of window to apply.
+
+    Returns:
+    - The windowed signal as an array.
+    """
+    # Validate window type input
     if not isinstance(window_type, (str, tuple)):
         raise ValueError("Window type must be a string or a tuple")
-    # Generate the window using scipy's get_window function
+    # Generate the window based on the specified type and signal length
     window = get_window(window_type, len(signal))
+    # Apply the window to the signal by element-wise multiplication
     return signal * window
+
 def reduce_noise_and_label(df, dt):
+    """
+       Applies signal processing techniques to reduce noise, detect peaks, and calculate distances from a DataFrame of signals.
+
+       Parameters:
+       - df: DataFrame, containing signals in its rows.
+       - dt: float, the time interval between signal samples.
+
+       Returns:
+       - peaks_list: ndarray, the positions of the highest peak in each signal.
+       - distances: ndarray, the calculated distance for each signal based on the peak position.
+       - filtered_signals: ndarray, the signals after noise reduction and filtering.
+    """
     distances = np.zeros((len(df.index),), dtype=float)
     peaks_list = np.zeros((len(df.index),), dtype=int)
     filtered_signals = np.zeros(df.shape)  # Initialize array to store filtered signals
@@ -26,27 +62,26 @@ def reduce_noise_and_label(df, dt):
     for i in range(len(df.index)):
         f = df.iloc[i, :]
 
-        # Apply window function to the signal
+        # Apply window function to the signal to reduce edge effects
         windowed_signal = apply_window(f)
 
+        # Fourier Transform for frequency analysis
         n = len(windowed_signal)
-        time = np.arange(n) * dt  # Time array
         fhat = np.fft.fft(windowed_signal, n)
         PSD = fhat * np.conj(fhat) / n
-        freq = (1 / (dt * n)) * np.arange(n)
-        L = np.arange(1, n // 2, dtype='int')
 
         indices = PSD > 1.5  # Thresholding the Power Spectral Density
-        PSDclean = PSD * indices
         fhat = indices * fhat
-        ffilt = np.fft.ifft(fhat)
+        ffilt = np.fft.ifft(fhat) # Inverse FFT for filtered signal
 
-        filtered_signals[i, :] = ffilt.real  # Store the real part of the filtered signal
+        filtered_signals[i, :] = ffilt.real  # Store the filtered signal
 
+        # Analyze the signal envelope to find peaks
         analytical_signal = hilbert(ffilt.real)
         env = np.abs(analytical_signal)
         peaks, _ = find_peaks(env, distance=n)
 
+        # Calculate distance based on peak position
         if len(peaks) > 0:
             pos_highest_peak = peaks[0]  # Position of the highest peak, assuming it's the first one
             distance = 0.5 * pos_highest_peak * dt * 2 * 343  # Calculate distance
@@ -73,7 +108,6 @@ def group_labeled_data(peaks_list, signal_length, window_width):
     """
     # Calculate the number of windows in each signal
     n_windows = signal_length // window_width
-    print("No of windows", n_windows)
 
     # Initialize the label matrix
     y_label = np.zeros((len(peaks_list), n_windows), dtype=int)
@@ -83,13 +117,24 @@ def group_labeled_data(peaks_list, signal_length, window_width):
         if peak >= 0:  # Check if a peak was detected
             # Determine which window the peak falls into
             window_index = peak // window_width
-            print("window number where peaks fall into", window_index)
             # Set the corresponding label to 1
             if window_index < n_windows:
                 y_label[i, window_index] = 1
     return y_label
 
 def train_model(xtrain, xtest, ytrain, ytest):
+    """
+      Trains a Convolutional Neural Network model on the provided training data and evaluates its performance on the test data.
+
+      Parameters:
+      - xtrain: ndarray, training data features.
+      - xtest: ndarray, test data features.
+      - ytrain: ndarray, training data labels.
+      - ytest: ndarray, test data labels.
+
+      Returns:
+      - The trained model.
+      """
     verbose, epochs, batch_size = 1, 10, 32
     model = Sequential()
     # Model architecture
@@ -125,8 +170,6 @@ if __name__ == "__main__":
     signal_length = len(df.columns)
     y_label = group_labeled_data(peaks, signal_length, window_width)
     x_data = filtered_signals
-    print(x_data)
-    print(y_label)
 
     x_train, x_test, y_train, y_test = train_test_split(x_data, y_label, test_size=0.2, random_state=42)
     model = train_model(x_train, x_test, y_train, y_test)
