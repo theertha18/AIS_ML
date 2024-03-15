@@ -5,7 +5,7 @@ import time
 import pickle
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score, recall_score, confusion_matrix, classification_report
+from sklearn.metrics import f1_score, classification_report
 
 def read_and_prepare_data(dataset_path):
     """
