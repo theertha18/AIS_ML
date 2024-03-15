@@ -8,7 +8,7 @@ from tensorflow.keras.layers import Conv1D, Dropout, MaxPooling1D, Flatten, Dens
 from sklearn.metrics import classification_report
 
 def read_and_prepare_data(dataset_path):
-    dataframe = pd.read_csv(dataset_path)
+    dataframe = pd.read_csv(dataset_path, header=None)
     df = dataframe.iloc[:, 16:]
     return df
 def apply_window(signal, window_type='hann'):
