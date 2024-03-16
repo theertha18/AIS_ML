@@ -36,6 +36,6 @@ Install the required packages:
 ## Usage
 Each script can be run individually, depending on the specific needs of the analysis or model training process. For example, to run the CNN model training script, use:
 ```bash
-python CNN_Model.py
+   python CNN_Model.py
 ```
 Ensure the necessary data files are in the correct directories as expected by each script.
