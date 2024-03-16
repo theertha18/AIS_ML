@@ -12,7 +12,7 @@ This project focuses on enhancing the reliability of a sensor system used for ob
 Ensure Python 3.9 or above is installed on your system. You can download it from the official Python website.
 Install the required packages:
 ```bash
-pip install -r requirements.txt
+   pip install -r requirements.txt
 ```
 
 ## Scripts Description
