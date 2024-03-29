@@ -33,9 +33,18 @@ Install the required packages:
 
 - **TXT_to_CSV_converter.py**: Converts text files to CSV format, aiding in data preprocessing.
 
+- **ADC_To_FFT_Plot_Enveloped.py**: This code takes a CSV file containing signals, filters each signal using Fourier Transform and Power Spectral Density, detects peaks in the envelope of the filtered signal,                                         plots the original and zoomed-in versions of the filtered signal with its envelope and peaks, and saves the plots as image files.
+- **app.py**: This Flask web application serves as an interface for uploading CSV files containing signals, predicts peaks in the signals using a pre-trained CNN model, and displays the predicted peak positions 
+              and distances from peaks on the web page while also calling an external Python script for further processing.
+- **index.html**: This HTML template provides a user interface for uploading files, displaying predicted peak positions, windows, and distances from peaks, and rendering a plot image if available.  
+
 ## Usage
 Each script can be run individually, depending on the specific needs of the analysis or model training process. For example, to run the CNN model training script, use:
 ```bash
    python CNN_Model.py
+```
+For GUI, you can run:
+```bash
+   python app.py
 ```
 Ensure the necessary data files are in the correct directories as expected by each script.
