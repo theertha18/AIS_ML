@@ -25,14 +25,16 @@ MODEL_PATH = os.environ.get('MODEL_PATH')
 if not UPLOAD_FOLDER:
     UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Dataset')
 if not MODEL_PATH:
-    MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model.h5')
+    MODEL_PATH = os.path.join(os.getcwd(), 'Trained Models', 'cnn_model.h5')
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MODEL_PATH'] = MODEL_PATH
 
+
 class UploadFileForm(FlaskForm):
     file = FileField("File", validators=[InputRequired()])
     submit = SubmitField("Upload File")
+
 
 def predict_peaks(csv_path, model_path, window_width, Fs):
     """
@@ -45,11 +47,15 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     - Fs: Sampling frequency used in training.
 
     Returns:
-    - peak_predictions: Predicted peak positions for each signal.
+    - peak_positions: Predicted peak positions for each signal.
+    - windows: Windows calculated during prediction.
+    - distances_from_peaks: Distances from predicted peaks for each signal.
     """
     dt = 1 / Fs
     df = read_and_prepare_data(csv_path)
     _, _, filtered_signals = reduce_noise_and_label(df, dt)
+
+    filtered_signals = np.reshape(filtered_signals, (1, -1))
 
     # Load the saved model
     model = tf.keras.models.load_model(model_path)
@@ -64,11 +70,26 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     # Calculate distances from predicted peaks (assuming speed of sound is 343 m/s)
     distances_from_peaks = peak_positions * dt * 343
 
-    return peak_positions, windows, distances_from_peaks
+    # Convert NumPy arrays to Python lists
+    peak_positions = peak_positions.tolist()
+    distances_from_peaks = distances_from_peaks.tolist()
+
+    return peak_positions, windows.tolist(), distances_from_peaks
+
+
+def change_file_permissions(file_path):
+    try:
+        # Change file permissions to read and write for owner, group, and others
+        os.chmod(file_path, 0o666)  # Adjust permissions as needed
+        print("File permissions changed successfully.")
+    except PermissionError as e:
+        print(f"PermissionError: {e}")
+
 
 def call_adc_to_fft():
     script_path = os.path.join(os.getcwd(), 'ADC_To_FFT_Plot_Enveloped.py')
     subprocess.run(['python', script_path])
+
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -84,12 +105,18 @@ def home():
         model_path = app.config['MODEL_PATH']
         window_width = 64
         Fs = 1953125
+
+        # Change file permissions before processing
+        change_file_permissions(csv_path)
+
         peak_positions, windows, distances_from_peaks = predict_peaks(csv_path, model_path, window_width, Fs)
 
         # Call adc_to_fft.py script
         call_adc_to_fft()
 
-    return render_template('index.html', form=form, peak_positions=peak_positions, windows=windows, distances_from_peaks=distances_from_peaks)
+    return render_template('index.html', form=form, peak_positions=peak_positions, windows=windows,
+                           distances_from_peaks=distances_from_peaks)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
