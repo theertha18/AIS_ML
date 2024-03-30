@@ -4,8 +4,13 @@ import pandas as pd
 from scipy.signal import find_peaks, hilbert, get_window
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.layers import Conv1D, Dropout, MaxPooling1D, Flatten, Dense
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
+from tensorflow.keras.layers import Conv1D, BatchNormalization, Dropout, MaxPooling1D, Flatten, Dense
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import LearningRateScheduler
+from collections import Counter
+
 
 def read_and_prepare_data(dataset_path):
     """
@@ -22,6 +27,12 @@ def read_and_prepare_data(dataset_path):
     # Select columns starting from the 17th (index 16) onwards, assuming these contain the relevant data
     df = dataframe.iloc[:, 16:]
     return df
+
+def normalize_data(x_data):
+    scaler = StandardScaler()
+    x_data_normalized = scaler.fit_transform(x_data.reshape(-1, x_data.shape[-1])).reshape(x_data.shape)
+    return x_data_normalized
+
 
 def apply_window(signal, window_type='hann'):
     """
@@ -122,7 +133,7 @@ def group_labeled_data(peaks_list, signal_length, window_width):
                 y_label[i, window_index] = 1
     return y_label
 
-def train_model(xtrain, xtest, ytrain, ytest):
+def train_model(x_train, x_test, y_train, y_test):
     """
       Trains a Convolutional Neural Network model on the provided training data and evaluates its performance on the test data.
 
@@ -135,27 +146,43 @@ def train_model(xtrain, xtest, ytrain, ytest):
       Returns:
       - The trained model.
       """
-    verbose, epochs, batch_size = 1, 10, 32
-    model = Sequential()
-    # Model architecture
-    model.add(Conv1D(filters=64, kernel_size=3, activation="relu", input_shape=(xtrain.shape[1], 1)))
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(MaxPooling1D(pool_size=5))
-    model.add(Flatten())
-    model.add(Dense(1052, activation='relu'))
-    model.add(Dense(len(ytrain[0]), activation='softmax'))
-    # Compile the model
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    #     class_labels = np.argmax(y_train, axis=1)
+    #     class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(class_labels), y=class_labels)
+    #     class_weight_dict = dict(enumerate(class_weights))
+
+    model = Sequential([
+        Conv1D(filters=32, kernel_size=3, activation="relu", input_shape=(x_train.shape[1], 1)),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+        Conv1D(filters=64, kernel_size=3, activation='relu'),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+        Dropout(0.5),
+        Flatten(),
+        Dense(256, activation='relu'),
+        Dense(y_train.shape[1], activation='softmax')
+    ])
+
+    optimizer = Adam(learning_rate=0.001)
+    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     model.summary()
-    # Fit the model
-    model.fit(xtrain, ytrain, epochs=epochs, batch_size=batch_size, verbose=verbose)
-    # Evaluate model
-    _, accuracy = model.evaluate(xtest, ytest, batch_size=batch_size, verbose=verbose)
-    accuracy = accuracy * 100.0
-    print('Accuracy of Model: ', accuracy)
+
+    def scheduler(epoch, lr):
+        if epoch < 10:
+            return lr
+        else:
+            return lr * np.exp(-0.1)
+
+    lr_scheduler = LearningRateScheduler(scheduler)
+
+    model.fit(x_train, y_train, validation_data=(x_test, y_test), epochs=20, batch_size=32, callbacks=[lr_scheduler],
+              verbose=1)
+
+    _, accuracy = model.evaluate(x_test, y_test, verbose=0)
+    print(f'Accuracy: {accuracy * 100:.2f}%')
+
     # Save the model
-    model.save(r'D:\AIS_ML\AIS_ML\Output\cnn_model_test.h5')
+    model.save(r'D:\AIS_ML\AIS_ML\Output\cnn_model.h5')
     return model
 
 if __name__ == "__main__":
@@ -171,20 +198,37 @@ if __name__ == "__main__":
     y_label = group_labeled_data(peaks, signal_length, window_width)
     x_data = filtered_signals
 
-    x_train, x_test, y_train, y_test = train_test_split(x_data, y_label, test_size=0.2, random_state=42)
-    model = train_model(x_train, x_test, y_train, y_test)
-    y_pred = model.predict(x_test)
+    x_data_normalized = normalize_data(x_data)  # Normalize the data
+
+    x_train, x_test, y_train, y_test = train_test_split(x_data_normalized, y_label, test_size=0.2, random_state=42)
+
+    # Filter out classes with insufficient samples
+    k_neighbors = 10
+    # Calculate class distribution in y_train
+    class_distribution = Counter(np.argmax(y_train, axis=1))
+    print("Class distribution in training data:", class_distribution)
+
+    # Identify classes with a number of samples greater than k_neighbors
+    valid_classes = [class_label for class_label, count in class_distribution.items() if count > k_neighbors]
+
+    # Filter x_train and y_train based on valid classes
+    train_indices = [i for i, label in enumerate(np.argmax(y_train, axis=1)) if label in valid_classes]
+    x_train_filtered = x_train[train_indices]
+    y_train_filtered = y_train[train_indices]
+
+    # For x_test and y_test, we'll include all samples that belong to the valid classes found in the training set
+    test_indices = [i for i, label in enumerate(np.argmax(y_test, axis=1)) if label in valid_classes]
+    x_test_filtered = x_test[test_indices]
+    y_test_filtered = y_test[test_indices]
+
+    # Train the model
+    model = train_model(x_train_filtered, x_test_filtered, y_train_filtered, y_test_filtered)
+
+    # Predictions and classification report
+    y_pred = model.predict(x_test_filtered)
     predicted_classes = np.argmax(y_pred, axis=1)
-
-    # Calculate and print classification report for detailed metrics
-    report = classification_report(np.argmax(y_test, axis=1), predicted_classes, output_dict=True)
-    print("Classification Report:")
-    print(classification_report(np.argmax(y_test, axis=1), predicted_classes))
-
-    # Extract and print specific metrics from the report
-    print("Accuracy:", report['accuracy'])
-    print("Weighted F1 Score:", report['weighted avg']['f1-score'])
-    print("Weighted Recall:", report['weighted avg']['recall'])
+    actual_classes = np.argmax(y_test_filtered, axis=1)
+    print(classification_report(actual_classes, predicted_classes))
 
     end_time = time.time()
     print("Time taken to calculate distances and train the model:", end_time - start_time, "seconds")

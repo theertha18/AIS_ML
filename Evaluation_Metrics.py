@@ -1,10 +1,7 @@
-import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, classification_report
-from keras.models import load_model
+from sklearn.metrics import confusion_matrix
 from CNN_Model import *
 
 # Load and prepare your data
