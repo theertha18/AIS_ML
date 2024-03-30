@@ -28,9 +28,32 @@ def read_and_prepare_data(dataset_path):
     df = dataframe.iloc[:, 16:]
     return df
 
+
 def normalize_data(x_data):
+    """
+    Normalizes the input data using Standard Scaler.
+
+    Standard Scaler standardizes the features by removing the mean and scaling to unit variance.
+    This means each feature (or column in the case of 2D input) will have a mean value of 0 and a standard deviation of 1.
+
+    Parameters:
+    x_data (numpy.ndarray): The input data to be normalized. This can be a 2D array where each row represents a sample and each column represents a feature.
+
+    Returns:
+    numpy.ndarray: The normalized data having the same shape as the input data.
+    """
+
+    # Initialize the StandardScaler object
     scaler = StandardScaler()
-    x_data_normalized = scaler.fit_transform(x_data.reshape(-1, x_data.shape[-1])).reshape(x_data.shape)
+
+    # Fit the scaler to the data and transform it in one step.
+    # The data is reshaped to a 2D array if necessary because StandardScaler expects 2D inputs.
+    # For example, if x_data is a 1D array, it's reshaped to (-1, x_data.shape[-1]) to make it 2D.
+    x_data_normalized = scaler.fit_transform(x_data.reshape(-1, x_data.shape[-1]))
+
+    # After scaling, reshape the data back to its original shape
+    x_data_normalized = x_data_normalized.reshape(x_data.shape)
+
     return x_data_normalized
 
 
