@@ -12,8 +12,23 @@ from CNN_Model import read_and_prepare_data, reduce_noise_and_label
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
-app.config['UPLOAD_FOLDER'] = r'C:\Users\RICHA\AIS_ML\Dataset'
-app.config['MODEL_PATH'] = r'C:\Users\RICHA\AIS_ML\Output\cnn_model_test.h5'
+
+# Use relative paths if possible
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Dataset')
+MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model_test.h5')
+
+# Or use environment variables
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER')
+MODEL_PATH = os.environ.get('MODEL_PATH')
+
+# If environment variables are not set, fallback to default paths
+if not UPLOAD_FOLDER:
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Dataset')
+if not MODEL_PATH:
+    MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model_test.h5')
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MODEL_PATH'] = MODEL_PATH
 
 class UploadFileForm(FlaskForm):
     file = FileField("File", validators=[InputRequired()])
@@ -52,7 +67,7 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     return peak_positions, windows, distances_from_peaks
 
 def call_adc_to_fft():
-    script_path = r'C:\Users\RICHA\AIS_ML\ADC_FFT_Plot_Enveloped.py'  # Update with the correct path
+    script_path = os.path.join(os.getcwd(), 'ADC_FFT_Plot_Enveloped.py')
     subprocess.run(['python', script_path])
 
 @app.route('/', methods=['GET', 'POST'])
