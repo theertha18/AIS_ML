@@ -33,14 +33,14 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     windows = np.argmax(predictions, axis=1)
 
     # Convert predictions to peak positions or other relevant metric
-    peak_predictions = windows * window_width + 45
+    peak_predictions = windows * window_width
 
     return peak_predictions
 
 if __name__ == "__main__":
     start_time = time.time()
-    saved_model_path = r'D:\AIS_ML\AIS_ML\Output\cnn_model_test.h5'
-    dataset_path = r'D:\AIS_ML\AIS_ML\Dataset\test100.csv'
+    saved_model_path = r'D:\AIS_ML\AIS_ML\Trained_Model\cnn_model.h5'
+    dataset_path = r'D:\AIS_ML\AIS_ML\Dataset\merged_dataset_1.csv'
     window_width = 64
     Fs = 1953125  # Sampling frequency in Hz
     dt = 1 / Fs
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 
     distances_from_peaks = peak_predictions * dt * 343
     print("Calculated distances from predicted peaks:", distances_from_peaks)
-
+    # np.set_printoptions(threshold=np.inf)
     peak_differences = np.abs(peak_predictions - peaks)
     print("Differences between actual and predicted peak positions:", peak_differences)
 

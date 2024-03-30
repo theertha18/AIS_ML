@@ -15,7 +15,7 @@ app.config['SECRET_KEY'] = 'supersecretkey'
 
 # Use relative paths if possible
 UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Dataset')
-MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model_test.h5')
+MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model.h5')
 
 # Or use environment variables
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER')
@@ -25,7 +25,7 @@ MODEL_PATH = os.environ.get('MODEL_PATH')
 if not UPLOAD_FOLDER:
     UPLOAD_FOLDER = os.path.join(os.getcwd(), 'Dataset')
 if not MODEL_PATH:
-    MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model_test.h5')
+    MODEL_PATH = os.path.join(os.getcwd(), 'Output', 'cnn_model.h5')
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MODEL_PATH'] = MODEL_PATH
@@ -59,7 +59,7 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     windows = np.argmax(predictions, axis=1)
 
     # Convert predictions to peak positions
-    peak_positions = windows * window_width + 45
+    peak_positions = windows * window_width
 
     # Calculate distances from predicted peaks (assuming speed of sound is 343 m/s)
     distances_from_peaks = peak_positions * dt * 343
@@ -67,7 +67,7 @@ def predict_peaks(csv_path, model_path, window_width, Fs):
     return peak_positions, windows, distances_from_peaks
 
 def call_adc_to_fft():
-    script_path = os.path.join(os.getcwd(), 'ADC_FFT_Plot_Enveloped.py')
+    script_path = os.path.join(os.getcwd(), 'ADC_To_FFT_Plot_Enveloped.py')
     subprocess.run(['python', script_path])
 
 @app.route('/', methods=['GET', 'POST'])
